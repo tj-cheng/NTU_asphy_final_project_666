@@ -107,7 +107,7 @@ def ComputeNearCellLabel(points):
                 
         for j in range(numnode):
             mag = np.linalg.norm(points[label]-medge[j])
-            for k in range(9):
+            for k in range(N):
                 if(k != label):
                     mag1 = np.linalg.norm(points[k]-medge[j])
                     if(np.abs(mag-mag1) < 10**-5):
