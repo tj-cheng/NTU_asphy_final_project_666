@@ -6,14 +6,14 @@ points = np.array([[3, .2], [-2, 1], [0, 2.1], [1.1, -1], [1, 1], [0.9, 1.9],[2.
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
 vor = Voronoi(points)
-label = 4
+label = 8
 
 print("points[4] =", points[label])
 #print("ridge_points=",vor.ridge_points[5])
 #print("ridge_vertics=",vor.ridge_vertices[5])
 print("region for point 4 =", vor.point_region[label])
 print("vertices for region for point 4 =", vor.regions[vor.point_region[label]])
-print(points[vor.regions[vor.point_region[label]]])
+#print(points[vor.regions[vor.point_region[label]]])
 print("coordinate of Voronoi vertices associated with point 4:")
 print(vor.vertices[vor.regions[vor.point_region[label]]])
 edgevec=vor.vertices[vor.regions[vor.point_region[label]]]
