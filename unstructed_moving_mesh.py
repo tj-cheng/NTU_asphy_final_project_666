@@ -167,10 +167,16 @@ def ComputeAveragedFluxij(fflux,U,w):
 def Sum_AijFij():
 # x------------------
 
-# x------------------
-def UpdatePosition():
+# o------------------
+def UpdatePosition(points,U,dt):
 # 0.5dt
-# x------------------
+    for i in range(N):
+        wx = (U[i,1] / U[i,0])
+        wy = (U[i,2] / U[i,0])
+        points[i,0] += wx*dt
+        points[i,1] += wy*dt
+    return points
+# o------------------
 
 # x------------------
 def UpdateU():
