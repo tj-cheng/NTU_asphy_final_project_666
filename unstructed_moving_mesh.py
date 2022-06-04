@@ -2,6 +2,7 @@ from math import gamma
 import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d
 import matplotlib.pyplot as plt
+import random
 
 #--------------------------------------------------------------------
 # parameters
@@ -25,15 +26,29 @@ t = 0
 points = np.empty( (N,2) )
 U = np.empty( (N,4) )
 F = np.empty( (N,2,4) )
-# x-------------------
-# init point, U, F
-vor = Voronoi(points)
-fig = voronoi_plot_2d(vor)
-ax = plt.gca()
-ax.set_xlim(0,L)
-ax.set_ylim(0,L)
-plot()
-# x-------------------
+
+def init():
+    cell = 200
+    random.seed(10)
+    sigma = 0.1
+    listx = []
+    listy = []
+    while(len(listx)<N):
+        for x in range(cell -1):
+            for y in range(cell -1):
+                if (random.random() < np.e**-(((x-cell/2)*L/cell/sigma)**2+((y-cell/2)*L/cell/sigma)**2)):
+                    listx.append((x+1)/cell)
+                    listy.append((y+1)/cell)
+
+    index = np.arange(0,len(listx))
+    random.shuffle(index)
+    U[:,0] = 1
+    U[:,1:3] = 0
+    U[:,3] = 5
+    for i in range(N):
+        points[i,0] = listx[index[i]]
+        points[i,1] = listy[index[i]]
+        F[i,:] = Conserved2Flux(U[i,:])
 
 def Conserved2Flux(u):
     flux = np.empty( (2,4) )
@@ -56,7 +71,7 @@ def ComputePressure( rho, rhovx, rhovy, E ):
    P = (gamma-1.0)*( E - 0.5*(rhovx**2.0+rhovy**2)/rho )
    return P
 
-# x------------------------------
+# o------------------------------
 def ComputeTimestep( U ):
    P = ComputePressure( U[:,0], U[:,1], U[:,2] )
    a = ( gamma*P/U[:,0] )**0.5
@@ -69,7 +84,14 @@ def ComputeTimestep( U ):
    return min( dt_cfl, dt_end )
 
 def min_distance():
-# x------------------------------
+    min = L*2**0.5
+    for i in range(N):
+        for j in range(N):
+            dis = ((points[i,0]-points[j,0])**2+ (points[i,1]-points[j,1])**2)**0.5
+            if dis < min:
+                min = dis
+    return min
+# o------------------------------
 
 # x------------------
 def ComputeFluxFunction():
@@ -98,8 +120,20 @@ def UpdateU():
 # x------------------
 
 # x------------------vivi
-def plot():
+def plot(t):
+    ax = plt.gca()
+    ax.set_xlim(0,L)
+    ax.set_ylim(0,L)
+    plt.savefig('fig_%03d.png'%t)
 # x------------------
+
+# o-------------------
+# init point, U, F
+init()
+vor = Voronoi(points)
+fig = voronoi_plot_2d(vor)
+plot(fig, 0)
+# o-------------------
 
 num = 0
 while(t<end_time):
