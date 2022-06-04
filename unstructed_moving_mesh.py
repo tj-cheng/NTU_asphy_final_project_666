@@ -93,6 +93,32 @@ def min_distance():
     return min
 # o------------------------------
 
+# o------------------
+def ComputeNearCellLabel(points):
+    nn = [ [] for i in range(N) ]
+    for label in range(N):
+        edgevec=vor.vertices[vor.regions[vor.point_region[label]]]
+        numnode=len(edgevec)
+        medge=[]
+        for i in range(numnode):
+            j = (i+1)%numnode
+            midP = (edgevec[i]+edgevec[j])/2.
+            medge.append(midP)
+                
+        for j in range(numnode):
+            mag = np.linalg.norm(points[label]-medge[j])
+            for k in range(9):
+                if(k != label):
+                    mag1 = np.linalg.norm(points[k]-medge[j])
+                    if(np.abs(mag-mag1) < 10**-5):
+                        box = mag1
+                        boxlabel = k
+            nn[label].append(boxlabel)
+            #print(points[label],boxlabel,points[boxlabel])
+    print(nn)
+    return nn #如果有重複label表示不是close cell
+# o------------------
+
 # x------------------
 def ComputeFluxFunction():
 # x------------------
