@@ -120,7 +120,8 @@ def ComputeNearCellLabel(points):
 # o------------------
 
 # x------------------
-def ComputeFluxFunction():
+def ComputeFluxFunction(U):
+
 # x------------------
 
 # x------------------
