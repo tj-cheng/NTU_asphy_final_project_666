@@ -96,6 +96,7 @@ def min_distance():
 # o------------------
 def ComputeNearCellLabel(points):
     nn = [ [] for i in range(N) ]
+    fp = [ [] for i in range(N) ]
     for label in range(N):
         edgevec=vor.vertices[vor.regions[vor.point_region[label]]]
         numnode=len(edgevec)
@@ -114,9 +115,10 @@ def ComputeNearCellLabel(points):
                         box = mag1
                         boxlabel = k
             nn[label].append(boxlabel)
+            fp[label].append(medge[j])
             #print(points[label],boxlabel,points[boxlabel])
     print(nn)
-    return nn #如果有重複label表示不是close cell
+    return nn,fp #nn如果有重複label表示不是close cell
 # o------------------
 
 # o------------------

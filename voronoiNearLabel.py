@@ -17,6 +17,7 @@ print("vertices for region for point 4 =", vor.regions[vor.point_region[label]])
 print("coordinate of Voronoi vertices associated with point 4:")
 print(vor.vertices[vor.regions[vor.point_region[label]]])
 nn = [ [] for i in range(9) ]
+fp = [ [] for i in range(9) ]
 for label in range(9):
     edgevec=vor.vertices[vor.regions[vor.point_region[label]]]
     numnode=len(vor.vertices[vor.regions[vor.point_region[label]]])
@@ -36,10 +37,14 @@ for label in range(9):
                     boxlabel = k
                     
         nn[label].append(boxlabel)
+        fp[label].append(medge[j])
         
         print(points[label],boxlabel,points[boxlabel])
 
-print(nn)
+for i in range(9):
+    dic={}.fromkeys(nn[i])
+    if(len(dic) != len(nn[i])) : continue
+    print(nn[i],fp[i])
 
 
 
