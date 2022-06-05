@@ -134,7 +134,7 @@ def ComputeFluxFunction(points,F,U,nn,dt):
 # o------------------
 
 # o------------------
-def ComputeW(U,points,fp):
+def ComputeW(U,points,nn,fp):
     wp = [ [] for i in range(N) ]  #=w'
     w = [ [] for i in range(N) ]
 
@@ -163,9 +163,9 @@ def ComputeAveragedFluxij(fflux,U,w):
     fij = [ [] for i in range(N) ]
 # x------------------
 
-# x------------------
-def Sum_AijFij():
-# x------------------
+## x------------------
+#def Sum_AijFij():
+## x------------------
 
 # o------------------
 def UpdatePosition(points,U,dt):
@@ -178,9 +178,15 @@ def UpdatePosition(points,U,dt):
     return points
 # o------------------
 
-# x------------------
-def UpdateU():
-# x------------------
+# o------------------
+def UpdateU(U,nn,fij,dt):
+    for i in range(N):
+        dic={}.fromkeys(nn[i])
+        if(len(dic) != len(nn[i])) : continue
+        for j in range(len(nn[i])):
+            U += -fij[i][j]*dt
+    return U
+# o------------------
 
 # x------------------vivi
 def plot(t):
