@@ -1,4 +1,7 @@
 from math import gamma
+from re import M
+from threading import main_thread
+from more_itertools import nth
 import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d
 import matplotlib.pyplot as plt
@@ -13,10 +16,10 @@ N = 100
 cfl = 0.8
 gamma = 5.0/3.0
 cs       = 1.0
-end_time = 5.0
+end_time = 1.0
 
 # plotting parameters
-nstep_per_image = 1
+nstep_per_image = 10
 
 #--------------------------------------------------------------------
 # main
@@ -44,15 +47,14 @@ def init():
     random.shuffle(index)
     U[:,0] = 1
     U[:,1:3] = 0
-    U[:,3] = 5
+    U[:,3] = 50
     for i in range(N):
         points[i,0] = listx[index[i]]
         points[i,1] = listy[index[i]]
-        F[i,:] = Conserved2Flux(U[i,:])
+        F[i] = Conserved2Flux(U[i])
 
 def Conserved2Flux(u):
     flux = np.empty( (2,4) )
-
     P = ComputePressure( u[0], u[1], u[2], u[3] )
     wx = u[1] / u[0]
     wy = u[2] / u[0]
@@ -69,154 +71,153 @@ def Conserved2Flux(u):
 
 def ComputePressure( rho, rhovx, rhovy, E ):
    P = (gamma-1.0)*( E - 0.5*(rhovx**2.0+rhovy**2)/rho )
+   if P<0:
+    #    print("P<0")
+       P = 0
    return P
 
 # o------------------------------
 def ComputeTimestep( U ):
-   P = ComputePressure( U[:,0], U[:,1], U[:,2] )
-   a = ( gamma*P/U[:,0] )**0.5
-   u = np.abs( U[:,1]/U[:,0] )
+    P = np.empty(N)
+    for i in range(N):
+        P[i] = ComputePressure( U[i,0], U[i,1], U[i,2], U[i,3] )
+    a = ( gamma*P/U[:,0] )**0.5
+    u = np.abs( U[:,1]/U[:,0] )
+    max_info_speed = np.amax( u + a )
+    dt_cfl         = cfl*min_distance()/max_info_speed
+    dt_end         = end_time - t
 
-   max_info_speed = np.amax( u + a )
-   dt_cfl         = cfl*min_distance()/max_info_speed
-   dt_end         = end_time - t
-
-   return min( dt_cfl, dt_end )
+    return min( dt_cfl, dt_end )
 
 def min_distance():
     min = L*2**0.5
     for i in range(N):
         for j in range(N):
-            dis = ((points[i,0]-points[j,0])**2+ (points[i,1]-points[j,1])**2)**0.5
-            if dis < min:
-                min = dis
+            if(i!=j):
+                dis = ((points[i,0]-points[j,0])**2+ (points[i,1]-points[j,1])**2)**0.5
+                if dis < min:
+                    min = dis
     return min
 # o------------------------------
 
 # o------------------
-def ComputeNearCellLabel(points):
-    nn = [ [] for i in range(N) ]
-    fp = [ [] for i in range(N) ]
-    for label in range(N):
-        edgevec=vor.vertices[vor.regions[vor.point_region[label]]]
-        numnode=len(edgevec)
-        medge=[]
-        for i in range(numnode):
-            j = (i+1)%numnode
-            midP = (edgevec[i]+edgevec[j])/2.
+def ComputeNearCellLabel(nth_point):
+    fp = [] # face point
+    edgevec=vor.regions[vor.point_region[nth_point]]
+    numnode=len(edgevec)
+    medge = []
+    for i in range(numnode):
+        j = (i+1)%numnode
+        if(edgevec[i]!=-1 and edgevec[j]!=-1):
+            midP = (vor.vertices[edgevec[i]]+vor.vertices[edgevec[j]])/2.
+            mag = np.linalg.norm(points[nth_point]-midP) # point to midpoint distance
             medge.append(midP)
-                
-        for j in range(numnode):
-            mag = np.linalg.norm(points[label]-medge[j])
             for k in range(N):
-                if(k != label):
-                    mag1 = np.linalg.norm(points[k]-medge[j])
-                    if(np.abs(mag-mag1) < 10**-5):
-                        box = mag1
-                        boxlabel = k
-            nn[label].append(boxlabel)
-            fp[label].append(medge[j])
-            #print(points[label],boxlabel,points[boxlabel])
-    print(nn)
-    return nn,fp #nn如果有重複label表示不是close cell
+                if(k != nth_point):
+                    mag1 = np.linalg.norm(points[k]-midP)
+                    if(np.abs(mag-mag1) < 1e-15):
+                        fp.append(k)
+    if len(fp)!= len(medge): print("error", nth_point, len(fp), len(medge))
+    return fp, medge
 # o------------------
 
 # o------------------
-def ComputeFluxFunction(points,F,U,nn,dt):
-    fflux = [ [] for i in range(N) ]
-    for i in range(N):
-        dic={}.fromkeys(nn[i])
-        if(len(dic) != len(nn[i])) : continue
-        for j in range(len(nn[i])):
-            dx = np.linalg.norm(points[i]-points[nn[i][j]])
-            fflux[i][j] = 0.5*(F[i]+F[nn[j]]-(U[i]-U[nn[j]])*dx/dt)
+def ComputeFluxFunction(nth_point, face_point,dt):
+    dx = points[nth_point]-points[face_point]
+    fflux = 0.5*(F[nth_point]+F[face_point]-(U[nth_point]-U[face_point])*np.transpose(np.array([dx]))/dt)
     return fflux
 # o------------------
 
 # o------------------
-def ComputeW(U,points,nn,fp):
-    wp = [ [] for i in range(N) ]  #=w'
-    w = [ [] for i in range(N) ]
-
-    for i in range(N):
-        wx = (U[i,1] / U[i,0])
-        wy = (U[i,2] / U[i,0])
-        w[i][0].append(wx)
-        w[i][1].append(wy)
-        
-    for i in range(N):
-        dic={}.fromkeys(nn[i])
-        if(len(dic) != len(nn[i])) : continue
-        for j in range(len(nn[i])):
-            # i:L j:R
-            pointL = points[i]
-            pointR = points[nn[i][j]]
-            mag = np.linalg.norm(pointR-pointL)
-            wp[i][j] = np.dot(w[i]-w[j],fp[i][j]-(pointR+pointL)/2.)*(pointR-pointL)/mag**2 
-            w[i][j] = (w[i]+w[j])/2 + wp[i][j]
-
+def ComputeW(nth_point, face_point, MidEdge):
+    w_this = (U[nth_point,1:3] / U[nth_point,0])
+    w_face = (U[face_point,1:3] / U[face_point,0])
+    r_this = points[nth_point]
+    r_face = points[face_point]
+    
+    wp = (w_this-w_face)*(MidEdge-(r_this+r_face)/2)*(r_face-r_this)/(np.linalg.norm(r_this-r_face)**2)
+    w = (w_this+w_face)/2 +wp
     return w
 # o------------------
 
 # x------------------
-def ComputeAveragedFluxij(fflux,U,w):
-    fij = [ [] for i in range(N) ]
+def ComputeAveragedFlux(nth_point, mth_edge, face_point, MidEdge, dt):
+    f = ComputeFluxFunction(nth_point, face_point, dt)
+    w = ComputeW(nth_point, face_point, MidEdge)
+    Aij_vec = ((vor.vertices[vor.regions[vor.point_region[nth_point]][mth_edge]]-MidEdge)*2).dot(np.array([[0,1],[-1,0]]))
+    Fij = np.array([Aij_vec]).dot((f-U[nth_point]*np.transpose(np.array([w]))))
+    Fij = Fij.flatten()
+    return Fij
+
 # x------------------
 
-## x------------------
-#def Sum_AijFij():
-## x------------------
-
 # o------------------
-def UpdatePosition(points,U,dt):
-# 0.5dt
+def UpdatePosition(dt):
     for i in range(N):
         wx = (U[i,1] / U[i,0])
         wy = (U[i,2] / U[i,0])
         points[i,0] += wx*dt
         points[i,1] += wy*dt
-    return points
 # o------------------
 
 # o------------------
-def UpdateU(U,nn,fij,dt):
+def UpdateU(dt):
     for i in range(N):
-        dic={}.fromkeys(nn[i])
-        if(len(dic) != len(nn[i])) : continue
-        for j in range(len(nn[i])):
-            U += -fij[i][j]*dt
-    return U
+        face_point, MidEdge = ComputeNearCellLabel(i)
+        # print(len(face_point))
+        for j in range(len(face_point)):
+            flux = ComputeAveragedFlux(i, j, face_point[j], MidEdge[j], dt)
+            U[i] -= flux*dt
 # o------------------
 
 # x------------------vivi
-def plot(t):
+def plot(vor,t):
+    fig = voronoi_plot_2d(vor,show_vertices = False)
     ax = plt.gca()
     ax.set_xlim(0,L)
     ax.set_ylim(0,L)
-    plt.savefig('fig_%03d.png'%t)
+    ax.set_aspect('equal', adjustable='box')
+    plt.savefig('fig_%03d.png'%t,dpi=150)
 # x------------------
 
 # o-------------------
 # init point, U, F
 init()
 vor = Voronoi(points)
-fig = voronoi_plot_2d(vor)
-plot(fig, 0)
+plot(vor, 0)
 # o-------------------
-
+dt = ComputeTimestep( U )
 num = 0
 while(t<end_time):
 
     for i in range(nstep_per_image):
         dt = ComputeTimestep( U )
-        F =  Conserved2Flux(U)
-        UpdateU(dt)
+        for j in range(N):
+            F[j] =  Conserved2Flux(U[j])
+        UpdateU(0.5*dt)
         UpdatePosition(dt)
+        vor = Voronoi(points)
+        for j in range(N):
+            F[j] =  Conserved2Flux(U[j])
+        UpdateU(0.5*dt)
         t = dt+t
         vor = Voronoi(points)
+        print("%e -> %e , dt = %e"%(t-dt, t, dt))
         if(t>=end_time):break
     num +=1
-    plot(num)
+    plot(vor, num)
+
+# for i in range(1):
+
+#     dt = ComputeTimestep( U )
+#     for j in range(N):
+#         F[j] =  Conserved2Flux(U[j])
+#     UpdateU(dt)
+#     print(U[0])
+#     UpdatePosition(dt)
+#     t = dt+t
+#     vor = Voronoi(points)
+#     print("%e -> %e , dt = %e"%(t-dt, t, dt))
 
 
 
