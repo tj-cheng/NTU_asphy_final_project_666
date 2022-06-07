@@ -16,7 +16,7 @@ N = 100
 cfl = 0.8
 gamma = 5.0/3.0
 cs       = 1.0
-end_time = 1.0
+end_time = 5.0
 
 # plotting parameters
 nstep_per_image = 10
@@ -47,7 +47,7 @@ def init():
     random.shuffle(index)
     U[:,0] = 1
     U[:,1:3] = 0
-    U[:,3] = 50
+    U[:,3] = 5
     for i in range(N):
         points[i,0] = listx[index[i]]
         points[i,1] = listy[index[i]]
@@ -72,7 +72,7 @@ def Conserved2Flux(u):
 def ComputePressure( rho, rhovx, rhovy, E ):
    P = (gamma-1.0)*( E - 0.5*(rhovx**2.0+rhovy**2)/rho )
    if P<0:
-    #    print("P<0")
+       print("P<0")
        P = 0
    return P
 
@@ -82,7 +82,7 @@ def ComputeTimestep( U ):
     for i in range(N):
         P[i] = ComputePressure( U[i,0], U[i,1], U[i,2], U[i,3] )
     a = ( gamma*P/U[:,0] )**0.5
-    u = np.abs( U[:,1]/U[:,0] )
+    u = np.abs(( (U[:,1]/U[:,0])**2 + (U[:,2]/U[:,0])**2)**0.5)
     max_info_speed = np.amax( u + a )
     dt_cfl         = cfl*min_distance()/max_info_speed
     dt_end         = end_time - t
