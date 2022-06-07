@@ -1,7 +1,3 @@
-from math import gamma
-from re import M
-from threading import main_thread
-from more_itertools import nth
 import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d
 import matplotlib.pyplot as plt
