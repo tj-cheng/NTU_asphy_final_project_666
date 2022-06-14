@@ -15,7 +15,7 @@ cs       = 1.0
 end_time = 1.0
 
 # plotting parameters
-nstep_per_image = 10
+nstep_per_image = 3
 
 #--------------------------------------------------------------------
 # main
@@ -25,28 +25,34 @@ t = 0
 points = np.empty( (N,2) )
 U = np.empty( (N,4) )
 F = np.empty( (N,2,4) )
+w = np.empty( (N,2) )
 
 def init():
-    cell = 200
-    random.seed(10)
-    sigma = 0.1
-    listx = []
-    listy = []
-    while(len(listx)<N):
-        for x in range(cell -1):
-            for y in range(cell -1):
-                if (random.random() < np.e**-(((x-cell/2)*L/cell/sigma)**2+((y-cell/2)*L/cell/sigma)**2)):
-                    listx.append((x+1)/cell)
-                    listy.append((y+1)/cell)
+    cell = 20
+    # random.seed(10)
+    # sigma = 0.1
+    # listx = []
+    # listy = []
+    # while(len(listx)<N):
+    #     for x in range(cell -1):
+    #         for y in range(cell -1):
+    #             if (random.random() < np.e**-(((x-cell/2)*L/cell/sigma)**2+((y-cell/2)*L/cell/sigma)**2)):
+    #                 listx.append((x+1)/cell)
+    #                 listy.append((y+1)/cell)
 
-    index = np.arange(0,len(listx))
-    random.shuffle(index)
+    # index = np.arange(0,len(listx))
+    # random.shuffle(index)
+    for i in range(N//10):
+        for j in range(10):
+            points[10*i+j,1] = L/2+(1/cell*j-1/cell*5)
+            points[10*i+j,0] = 1/cell*(i+1)
     U[:,0] = 1
-    U[:,1:3] = 0
-    U[:,3] = 50
+    U[:,1] = 1
+    U[:,2] = 0
+    U[:,3] = 0.5
     for i in range(N):
-        points[i,0] = listx[index[i]]
-        points[i,1] = listy[index[i]]
+        # points[i,0] = listx[index[i]]
+        # points[i,1] = listy[index[i]]
         F[i] = Conserved2Flux(U[i])
 
 def Conserved2Flux(u):
@@ -68,7 +74,7 @@ def Conserved2Flux(u):
 def ComputePressure( rho, rhovx, rhovy, E ):
    P = (gamma-1.0)*( E - 0.5*(rhovx**2.0+rhovy**2)/rho )
    if P<0:
-    #    print("P<0")
+       print("P<0")
        P = 0
    return P
 
@@ -77,8 +83,8 @@ def ComputeTimestep( U ):
     P = np.empty(N)
     for i in range(N):
         P[i] = ComputePressure( U[i,0], U[i,1], U[i,2], U[i,3] )
-    a = ( gamma*P/U[:,0] )**0.5
-    u = np.abs( U[:,1]/U[:,0] )
+    a = ( np.abs(gamma*P/U[:,0] ))**0.5
+    u = np.abs(( (U[:,1]/U[:,0])**2 + (U[:,2]/U[:,0])**2)**0.5)
     max_info_speed = np.amax( u + a )
     dt_cfl         = cfl*min_distance()/max_info_speed
     dt_end         = end_time - t
@@ -102,16 +108,22 @@ def ComputeNearCellLabel(nth_point):
     edgevec=vor.regions[vor.point_region[nth_point]]
     numnode=len(edgevec)
     medge = []
+    # if(nth_point==1):
+    #     print(edgevec)
+    #     print(vor.vertices[edgevec])
     for i in range(numnode):
         j = (i+1)%numnode
         if(edgevec[i]!=-1 and edgevec[j]!=-1):
             midP = (vor.vertices[edgevec[i]]+vor.vertices[edgevec[j]])/2.
-            mag = np.linalg.norm(points[nth_point]-midP) # point to midpoint distance
+            # mag = np.linalg.norm(points[nth_point]-midP) # point to midpoint distance
             medge.append(midP)
             for k in range(N):
                 if(k != nth_point):
-                    mag1 = np.linalg.norm(points[k]-midP)
-                    if(np.abs(mag-mag1) < 1e-15):
+            #         mag1 = np.linalg.norm(points[k]-midP)
+            #         if(np.abs(mag-mag1) < 2e-15):
+            #             fp.append(k)
+                    k_edgevec =  vor.regions[vor.point_region[k]]
+                    if((edgevec[i] in k_edgevec) and (edgevec[j] in k_edgevec)):
                         fp.append(k)
     if len(fp)!= len(medge): print("error", nth_point, len(fp), len(medge))
     return fp, medge
@@ -150,10 +162,10 @@ def ComputeAveragedFlux(nth_point, mth_edge, face_point, MidEdge, dt):
 # o------------------
 def UpdatePosition(dt):
     for i in range(N):
-        wx = (U[i,1] / U[i,0])
-        wy = (U[i,2] / U[i,0])
-        points[i,0] += wx*dt
-        points[i,1] += wy*dt
+        # wx = (U[i,1] / U[i,0])
+        # wy = (U[i,2] / U[i,0])
+        points[i,0] += w[i,0]*dt
+        points[i,1] += w[i,1]*dt
 # o------------------
 
 # o------------------
@@ -170,10 +182,11 @@ def UpdateU(dt):
 def plot(vor,t):
     fig = voronoi_plot_2d(vor,show_vertices = False)
     ax = plt.gca()
-    ax.set_xlim(0,L)
-    ax.set_ylim(0,L)
+    ax.set_xlim(0.0,1.0)
+    ax.set_ylim(0.0,1.0)
     ax.set_aspect('equal', adjustable='box')
     plt.savefig('fig_%03d.png'%t,dpi=150)
+    plt.close()
 # x------------------
 
 # o-------------------
@@ -189,8 +202,12 @@ while(t<end_time):
     for i in range(nstep_per_image):
         dt = ComputeTimestep( U )
         for j in range(N):
+            w[j,0] = U[j,1]/U[j,0]
+            w[j,1] = U[j,2]/U[j,0]
             F[j] =  Conserved2Flux(U[j])
+            if U[j,0] <= 0: print("m<0")
         UpdateU(0.5*dt)
+        # UpdateU(dt)
         UpdatePosition(dt)
         vor = Voronoi(points)
         for j in range(N):
@@ -198,7 +215,7 @@ while(t<end_time):
         UpdateU(0.5*dt)
         t = dt+t
         vor = Voronoi(points)
-        print("%e -> %e , dt = %e"%(t-dt, t, dt))
+        print("step %d : %e -> %e , dt = %e"%(num*nstep_per_image+i,t-dt, t, dt))
         if(t>=end_time):break
     num +=1
     plot(vor, num)
